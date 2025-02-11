@@ -1,0 +1,7 @@
+streamlit
+pymongo
+pinecone-client
+openai
+pypdf2
+requests
+python-dotenv
