@@ -40,39 +40,47 @@ openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Function to process PDF and chunk it
 def process_pdf(pdf_path, chunk_size=500):
+    """Extracts text from a PDF and splits it into chunks."""
     with open(pdf_path, "rb") as file:
         reader = PyPDF2.PdfReader(file)
         text = "".join([page.extract_text() for page in reader.pages if page.extract_text()])
+    
     chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
     return chunks
 
 # Function to check if chunks already exist
 def chunks_exist(pdf_name):
+    """Checks if chunks for a given PDF already exist in MongoDB."""
     return collection.count_documents({"pdf_name": pdf_name}) > 0
 
 # Function to store chunks in MongoDB (only if not already stored)
 def insert_chunks(chunks, pdf_name):
+    """Inserts extracted chunks into MongoDB."""
     if not chunks_exist(pdf_name):
         for chunk in chunks:
             collection.insert_one({"pdf_name": pdf_name, "text": chunk})
 
 # Function to convert text into vectors and store in Pinecone
 def store_vectors(chunks, pdf_name):
+    """Embeds text chunks using OpenAI and stores them in Pinecone."""
     for i, chunk in enumerate(chunks):
         vector = openai_client.embeddings.create(input=[chunk], model="text-embedding-ada-002").data[0].embedding
         index.upsert([(f"{pdf_name}-doc-{i}", vector, {"pdf_name": pdf_name, "text": chunk})])
 
 # Function to retrieve stored PDFs from MongoDB repository
 def list_stored_pdfs():
-    return pdf_collection.distinct("pdf_name")  # Fetch unique PDF names
+    """Fetches unique stored PDF names from the database."""
+    return pdf_collection.distinct("pdf_name")
 
 # Function to store uploaded PDFs in MongoDB repository
 def store_pdf(pdf_name, pdf_data):
+    """Saves uploaded PDFs to MongoDB to avoid re-uploading the same file."""
     if pdf_collection.count_documents({"pdf_name": pdf_name}) == 0:
         pdf_collection.insert_one({"pdf_name": pdf_name, "pdf_data": pdf_data})
 
-# Function to query Pinecone and get accurate answers
+# Function to query Pinecone and get relevant answers
 def query_vectors(query, selected_pdf):
+    """Retrieves relevant document chunks from Pinecone and uses OpenAI for answers."""
     vector = openai_client.embeddings.create(input=[query], model="text-embedding-ada-002").data[0].embedding
     
     results = index.query(vector=vector, top_k=5, include_metadata=True, filter={"pdf_name": {"$eq": selected_pdf}})
@@ -80,7 +88,7 @@ def query_vectors(query, selected_pdf):
     if results["matches"]:
         matched_texts = [match["metadata"]["text"] for match in results["matches"]]
 
-        # Improve response quality by sending multiple relevant matches
+        # Combine matched chunks for better response context
         combined_text = "\n\n".join(matched_texts)
 
         prompt = (
@@ -103,13 +111,21 @@ def query_vectors(query, selected_pdf):
 
 # Function to translate text
 def translate_text(text, target_language):
+    """Translates text to the specified language (English or Arabic)."""
     return GoogleTranslator(source="auto", target=target_language).translate(text)
 
-# Streamlit UI
+# ==============================
+# 🚀 Streamlit UI
+# ==============================
 st.title("AI-Powered Saudi Arabia Law HelpDesk")
 
+# Fix: Initialize selected_pdf to avoid NameError
+selected_pdf = None
+
+# Select PDF source
 pdf_source = st.radio("Select PDF Source", ["Upload from PC", "Choose from Repository"])
 
+# 📌 Upload a new PDF
 if pdf_source == "Upload from PC":
     uploaded_file = st.file_uploader("Upload a PDF", type=["pdf"])
     if uploaded_file:
@@ -128,21 +144,30 @@ if pdf_source == "Upload from PC":
         else:
             st.info("This PDF has already been processed!")
 
+        # Assign uploaded file name to selected_pdf
+        selected_pdf = uploaded_file.name
+
+# 📌 Browse previously uploaded PDFs
 elif pdf_source == "Choose from Repository":
     pdf_list = list_stored_pdfs()
-    selected_pdf = st.selectbox("Select a PDF", pdf_list)
+    if pdf_list:
+        selected_pdf = st.selectbox("Select a PDF", pdf_list)
+    else:
+        st.warning("No PDFs available in the repository. Please upload one.")
 
-# 🟢 FIX: Move the language selection ABOVE the button to work properly
+# 🟢 Language Selection (Moved above button)
 lang_option = st.radio("Choose Response Language", ["English", "Arabic"], index=0)
 
+# Query Input
 query = st.text_input("Ask a question:")
 
+# 📌 Get Answer Button
 if st.button("Get Answer"):
     if selected_pdf and query:
-        # Translate input query if it's in Arabic
         detected_lang = GoogleTranslator(source="auto", target="en").translate(query)
         response = query_vectors(detected_lang, selected_pdf)
-        
+
+        # Translate response if Arabic is selected
         if lang_option == "Arabic":
             response = translate_text(response, "ar")
 
