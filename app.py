@@ -1,6 +1,6 @@
 import streamlit as st
 import pymongo
-import pinecone
+from pinecone import Pinecone
 import openai
 import PyPDF2
 import requests
@@ -19,9 +19,18 @@ collection = db["pdf_chunks"]
 # Pinecone Setup
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_ENV = os.getenv("PINECONE_ENV")
-pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENV)
-index = pinecone.Index("pdf-qna")
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index_name = "pdf-qna"
 
+# Create index if it doesn't exist
+if index_name not in pc.list_indexes().names():
+    pc.create_index(
+        name=index_name,
+        dimension=1536,  # Adjust if using a different model
+        metric="cosine"
+    )
+
+index = pc.Index(index_name)
 # OpenAI API Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
