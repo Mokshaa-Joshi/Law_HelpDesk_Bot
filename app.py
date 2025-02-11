@@ -168,7 +168,7 @@ elif pdf_source == "Choose from our Document Storage":
 lang_option = st.radio("Choose Response Language", ["English", "Arabic"], index=0)
 
 # Query Input
-query = st.text_input("Ask a question:")
+query = st.text_input("Ask a question:(English or Arabic")
 
 # 📌 Get Answer Button
 if st.button("Get Answer"):
