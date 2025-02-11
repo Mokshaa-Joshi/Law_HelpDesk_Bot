@@ -5,7 +5,7 @@ import openai
 import PyPDF2
 import os
 from dotenv import load_dotenv
-from deep_translator import GoogleTranslator  # For Arabic-English translation
+from deep_translator import GoogleTranslator  
 
 # Load environment variables (for local testing)
 load_dotenv()
@@ -15,7 +15,7 @@ MONGO_URI = os.getenv("MONGO_URI")
 client = pymongo.MongoClient(MONGO_URI)
 db = client["Saudi_Arabia_Law"]
 collection = db["pdf_chunks"]
-pdf_collection = db["pdf_repository"]  # Collection for storing PDFs
+pdf_collection = db["pdf_repository"]  
 
 # Pinecone Setup
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -29,7 +29,7 @@ index_name = "pdf-qna"
 if index_name not in pc.list_indexes().names():
     pc.create_index(
         name=index_name,
-        dimension=1536,  # Adjust if using a different model
+        dimension=1536,  
         metric="cosine"
     )
 
@@ -88,7 +88,7 @@ def query_vectors(query, selected_pdf):
     if results["matches"]:
         matched_texts = [match["metadata"]["text"] for match in results["matches"]]
 
-        # Combine matched chunks for better response context
+        
         combined_text = "\n\n".join(matched_texts)
 
         prompt = (
@@ -115,7 +115,7 @@ def translate_text(text, target_language):
     return GoogleTranslator(source="auto", target=target_language).translate(text)
 
 # ==============================
-# 🚀 Streamlit UI
+#  Streamlit UI
 # ==============================
 st.title("AI-Powered Saudi Arabia Law HelpDesk")
 
@@ -129,13 +129,13 @@ if pdf_list:
 else:
     st.sidebar.write("No PDFs stored yet. Upload one!")
 
-# Fix: Initialize selected_pdf to avoid NameError
+
 selected_pdf = None
 
 # Select PDF source
-pdf_source = st.radio("Select PDF Source", ["Upload from PC", "Choose from our Document Storage"])
+pdf_source = st.radio("Select PDF Source", ["Upload from PC", "Choose from the Document Storage"])
 
-# 📌 Upload a new PDF
+#  Upload a new PDF
 if pdf_source == "Upload from PC":
     uploaded_file = st.file_uploader("Upload a PDF", type=["pdf"])
     if uploaded_file:
@@ -157,20 +157,20 @@ if pdf_source == "Upload from PC":
         # Assign uploaded file name to selected_pdf
         selected_pdf = uploaded_file.name
 
-# 📌 Browse previously uploaded PDFs
-elif pdf_source == "Choose from our Document Storage":
+#  Browse previously uploaded PDFs
+elif pdf_source == "Choose from the Document Storage":
     if pdf_list:
         selected_pdf = st.selectbox("Select a PDF", pdf_list)
     else:
         st.warning("No PDFs available in the repository. Please upload one.")
 
-# 🟢 Language Selection
+#  Language Selection
 lang_option = st.radio("Choose Response Language", ["English", "Arabic"], index=0)
 
 # Query Input
-query = st.text_input("Ask a question:(English or Arabic)")
+query = st.text_input("Ask a question (in English or Arabic):")
 
-# 📌 Get Answer Button
+#  Get Answer Button
 if st.button("Get Answer"):
     if selected_pdf and query:
         detected_lang = GoogleTranslator(source="auto", target="en").translate(query)
