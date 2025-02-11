@@ -71,7 +71,7 @@ def query_vectors(query, selected_pdf):
     return results["matches"][0]["metadata"]["text"] if results["matches"] else "No relevant information found."
 
 # Streamlit UI
-st.title("AI-Powered Q&A Chatbot 📚")
+st.title("AI-Powered Saudi Arabia Law HelpDesk")
 
 pdf_source = st.radio("Select PDF Source", ["Upload from PC", "Choose from Repository"])
 
