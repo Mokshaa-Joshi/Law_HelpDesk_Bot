@@ -88,7 +88,7 @@ def query_vectors(query, selected_pdf):
     if results["matches"]:
         matched_texts = [match["metadata"]["text"] for match in results["matches"]]
 
-        
+        # Combine matched chunks for better response context
         combined_text = "\n\n".join(matched_texts)
 
         prompt = (
@@ -120,22 +120,21 @@ def translate_text(text, target_language):
 st.title("AI-Powered Saudi Arabia Law HelpDesk")
 
 # Sidebar - List all stored PDFs
-st.sidebar.header("📂 Stored PDFs")
+st.sidebar.header("Stored PDFs")
 pdf_list = list_stored_pdfs()
 if pdf_list:
-    with st.sidebar.expander("📜 View Stored PDFs", expanded=False):
+    with st.sidebar.expander("View Stored PDFs", expanded=False):
         for pdf in pdf_list:
-            st.sidebar.write(f"📄 {pdf}")
+            st.sidebar.write(pdf)
 else:
     st.sidebar.write("No PDFs stored yet. Upload one!")
-
 
 selected_pdf = None
 
 # Select PDF source
 pdf_source = st.radio("Select PDF Source", ["Upload from PC", "Choose from the Document Storage"])
 
-#  Upload a new PDF
+# Upload a new PDF
 if pdf_source == "Upload from PC":
     uploaded_file = st.file_uploader("Upload a PDF", type=["pdf"])
     if uploaded_file:
@@ -157,20 +156,20 @@ if pdf_source == "Upload from PC":
         # Assign uploaded file name to selected_pdf
         selected_pdf = uploaded_file.name
 
-#  Browse previously uploaded PDFs
+# Browse previously uploaded PDFs
 elif pdf_source == "Choose from the Document Storage":
     if pdf_list:
         selected_pdf = st.selectbox("Select a PDF", pdf_list)
     else:
         st.warning("No PDFs available in the repository. Please upload one.")
 
-#  Language Selection
+# Language Selection
 lang_option = st.radio("Choose Response Language", ["English", "Arabic"], index=0)
 
 # Query Input
 query = st.text_input("Ask a question (in English or Arabic):")
 
-#  Get Answer Button
+# Get Answer Button
 if st.button("Get Answer"):
     if selected_pdf and query:
         detected_lang = GoogleTranslator(source="auto", target="en").translate(query)
@@ -180,6 +179,10 @@ if st.button("Get Answer"):
         if lang_option == "Arabic":
             response = translate_text(response, "ar")
 
-        st.write(f"**Answer:** {response}")
+        # Display response with RTL support for Arabic
+        if lang_option == "Arabic":
+            st.markdown(f"<div dir='rtl' style='text-align: right;'>{response}</div>", unsafe_allow_html=True)
+        else:
+            st.write(f"**Answer:** {response}")
     else:
         st.warning("Please enter a query and select a PDF.")
