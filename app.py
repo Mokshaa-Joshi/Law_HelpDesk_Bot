@@ -1,13 +1,13 @@
 import streamlit as st
 import pymongo
-from pinecone import Pinecone
+import pinecone
 import openai
 import PyPDF2
 import requests
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables (for local testing)
 load_dotenv()
 
 # MongoDB Connection
@@ -19,10 +19,12 @@ collection = db["pdf_chunks"]
 # Pinecone Setup
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_ENV = os.getenv("PINECONE_ENV")
+
+from pinecone import Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index_name = "pdf-qna"
 
-# Create index if it doesn't exist
+# Create index if not exists
 if index_name not in pc.list_indexes().names():
     pc.create_index(
         name=index_name,
@@ -31,6 +33,7 @@ if index_name not in pc.list_indexes().names():
     )
 
 index = pc.Index(index_name)
+
 # OpenAI API Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -50,12 +53,12 @@ def insert_chunks(chunks):
 # Function to convert text into vectors and store in Pinecone
 def store_vectors(chunks):
     for i, chunk in enumerate(chunks):
-        vector = openai.Embedding.create(input=chunk, model="text-embedding-ada-002")["data"][0]["embedding"]
+        vector = openai.embeddings.create(input=[chunk], model="text-embedding-ada-002").data[0].embedding
         index.upsert([(f"doc-{i}", vector, {"text": chunk})])
 
 # Function to query Pinecone and get answers
 def query_vectors(query):
-    vector = openai.Embedding.create(input=query, model="text-embedding-ada-002")["data"][0]["embedding"]
+    vector = openai.embeddings.create(input=[query], model="text-embedding-ada-002").data[0].embedding
     results = index.query(vector=vector, top_k=1, include_metadata=True)
     return results["matches"][0]["metadata"]["text"] if results["matches"] else "No relevant information found."
 
@@ -84,10 +87,11 @@ pdf_source = st.radio("Select PDF Source", ["Upload from PC", "Choose from Repos
 if pdf_source == "Upload from PC":
     uploaded_file = st.file_uploader("Upload a PDF", type=["pdf"])
     if uploaded_file:
-        with open(f"temp_{uploaded_file.name}", "wb") as f:
+        temp_pdf_path = f"temp_{uploaded_file.name}"
+        with open(temp_pdf_path, "wb") as f:
             f.write(uploaded_file.read())
 
-        chunks = process_pdf(f"temp_{uploaded_file.name}")
+        chunks = process_pdf(temp_pdf_path)
         insert_chunks(chunks)
         store_vectors(chunks)
         st.success("PDF uploaded and processed!")
