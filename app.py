@@ -13,7 +13,7 @@ load_dotenv()
 # MongoDB Connection
 MONGO_URI = os.getenv("MONGO_URI")
 client = pymongo.MongoClient(MONGO_URI)
-db = client["pdf_database"]
+db = client["Saudi_Arabia_Law"]
 collection = db["pdf_chunks"]
 
 # Pinecone Setup
