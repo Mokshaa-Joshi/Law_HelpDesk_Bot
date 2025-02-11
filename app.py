@@ -36,7 +36,7 @@ if index_name not in pc.list_indexes().names():
 index = pc.Index(index_name)
 
 # OpenAI API Key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Function to process PDF and chunk it
 def process_pdf(pdf_path, chunk_size=500):
@@ -59,7 +59,7 @@ def insert_chunks(chunks, pdf_name):
 # Function to convert text into vectors and store in Pinecone
 def store_vectors(chunks, pdf_name):
     for i, chunk in enumerate(chunks):
-        vector = openai.embeddings.create(input=[chunk], model="text-embedding-ada-002").data[0].embedding
+        vector = openai_client.embeddings.create(input=[chunk], model="text-embedding-ada-002").data[0].embedding
         index.upsert([(f"{pdf_name}-doc-{i}", vector, {"pdf_name": pdf_name, "text": chunk})])
 
 # Function to retrieve stored PDFs from MongoDB repository
@@ -73,14 +73,14 @@ def store_pdf(pdf_name, pdf_data):
 
 # Function to query Pinecone and get accurate answers
 def query_vectors(query, selected_pdf):
-    vector = openai.embeddings.create(input=[query], model="text-embedding-ada-002").data[0].embedding
+    vector = openai_client.embeddings.create(input=[query], model="text-embedding-ada-002").data[0].embedding
     results = index.query(vector=vector, top_k=3, include_metadata=True, filter={"pdf_name": selected_pdf})
     
     if results["matches"]:
         best_match = results["matches"][0]["metadata"]["text"]
         prompt = f"Based on the following extracted text from {selected_pdf}, answer the query accurately:\n\n{best_match}\n\nQuery: {query}"
         
-        response = openai.ChatCompletion.create(
+        response = openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are an AI assistant that provides highly accurate answers from legal documents."},
