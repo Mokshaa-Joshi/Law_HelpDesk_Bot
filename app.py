@@ -119,6 +119,16 @@ def translate_text(text, target_language):
 # ==============================
 st.title("AI-Powered Saudi Arabia Law HelpDesk")
 
+# Sidebar - List all stored PDFs
+st.sidebar.header("📂 Stored PDFs")
+pdf_list = list_stored_pdfs()
+if pdf_list:
+    with st.sidebar.expander("📜 View Stored PDFs", expanded=False):
+        for pdf in pdf_list:
+            st.sidebar.write(f"📄 {pdf}")
+else:
+    st.sidebar.write("No PDFs stored yet. Upload one!")
+
 # Fix: Initialize selected_pdf to avoid NameError
 selected_pdf = None
 
@@ -148,14 +158,13 @@ if pdf_source == "Upload from PC":
         selected_pdf = uploaded_file.name
 
 # 📌 Browse previously uploaded PDFs
-elif pdf_source == "Choose from Repository":
-    pdf_list = list_stored_pdfs()
+elif pdf_source == "Choose from our Document Storage":
     if pdf_list:
         selected_pdf = st.selectbox("Select a PDF", pdf_list)
     else:
         st.warning("No PDFs available in the repository. Please upload one.")
 
-# 🟢 Language Selection (Moved above button)
+# 🟢 Language Selection
 lang_option = st.radio("Choose Response Language", ["English", "Arabic"], index=0)
 
 # Query Input
