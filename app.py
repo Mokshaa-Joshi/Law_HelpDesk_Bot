@@ -92,7 +92,10 @@ def query_vectors(query, selected_pdf):
 def translate_text(text, target_language):
     return GoogleTranslator(source="auto", target=target_language).translate(text)
 
-st.title("AI-Powered Saudi Arabia Law HelpDesk")
+st.markdown(
+    "<h1 style='text-align: center;'>AI-Powered Legal HelpDesk for Saudi Arabia</h1>",
+    unsafe_allow_html=True
+)
 
 st.sidebar.header("📂 Stored PDFs")
 pdf_list = list_stored_pdfs()
