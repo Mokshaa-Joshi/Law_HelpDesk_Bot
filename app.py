@@ -74,23 +74,32 @@ def store_pdf(pdf_name, pdf_data):
 # Function to query Pinecone and get accurate answers
 def query_vectors(query, selected_pdf):
     vector = openai_client.embeddings.create(input=[query], model="text-embedding-ada-002").data[0].embedding
-    results = index.query(vector=vector, top_k=3, include_metadata=True, filter={"pdf_name": selected_pdf})
     
+    results = index.query(vector=vector, top_k=5, include_metadata=True, filter={"pdf_name": {"$eq": selected_pdf}})
+
     if results["matches"]:
-        best_match = results["matches"][0]["metadata"]["text"]
-        prompt = f"Based on the following extracted text from {selected_pdf}, answer the query accurately:\n\n{best_match}\n\nQuery: {query}"
-        
+        matched_texts = [match["metadata"]["text"] for match in results["matches"]]
+
+        # Improve response quality by sending multiple relevant matches
+        combined_text = "\n\n".join(matched_texts)
+
+        prompt = (
+            f"Based on the following legal document ({selected_pdf}), provide an accurate and well-reasoned answer:\n\n"
+            f"{combined_text}\n\n"
+            f"User's Question: {query}"
+        )
+
         response = openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are an AI assistant that provides highly accurate answers from legal documents."},
+                {"role": "system", "content": "You are an AI assistant specialized in legal analysis."},
                 {"role": "user", "content": prompt}
             ]
         ).choices[0].message.content
 
         return response
     else:
-        return "No relevant information found."
+        return "No relevant information found in the selected document."
 
 # Function to translate text
 def translate_text(text, target_language):
@@ -123,12 +132,13 @@ elif pdf_source == "Choose from Repository":
     pdf_list = list_stored_pdfs()
     selected_pdf = st.selectbox("Select a PDF", pdf_list)
 
+# 🟢 FIX: Move the language selection ABOVE the button to work properly
+lang_option = st.radio("Choose Response Language", ["English", "Arabic"], index=0)
+
 query = st.text_input("Ask a question:")
 
 if st.button("Get Answer"):
     if selected_pdf and query:
-        lang_option = st.radio("Choose Response Language", ["English", "Arabic"])
-        
         # Translate input query if it's in Arabic
         detected_lang = GoogleTranslator(source="auto", target="en").translate(query)
         response = query_vectors(detected_lang, selected_pdf)
