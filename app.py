@@ -79,12 +79,16 @@ def query_vectors(query, selected_pdf):
     if results["matches"]:
         best_match = results["matches"][0]["metadata"]["text"]
         prompt = f"Based on the following extracted text from {selected_pdf}, answer the query accurately:\n\n{best_match}\n\nQuery: {query}"
+        
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": "You are an AI assistant that provides highly accurate answers from legal documents."},
-                      {"role": "user", "content": prompt}]
-        )
-        return response["choices"][0]["message"]["content"]
+            messages=[
+                {"role": "system", "content": "You are an AI assistant that provides highly accurate answers from legal documents."},
+                {"role": "user", "content": prompt}
+            ]
+        ).choices[0].message.content
+
+        return response
     else:
         return "No relevant information found."
 
@@ -124,7 +128,10 @@ query = st.text_input("Ask a question:")
 if st.button("Get Answer"):
     if selected_pdf and query:
         lang_option = st.radio("Choose Response Language", ["English", "Arabic"])
-        response = query_vectors(query, selected_pdf)
+        
+        # Translate input query if it's in Arabic
+        detected_lang = GoogleTranslator(source="auto", target="en").translate(query)
+        response = query_vectors(detected_lang, selected_pdf)
         
         if lang_option == "Arabic":
             response = translate_text(response, "ar")
