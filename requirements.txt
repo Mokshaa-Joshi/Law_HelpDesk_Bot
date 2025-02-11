@@ -5,3 +5,4 @@ openai
 pypdf2
 requests
 python-dotenv
+deep-translator
