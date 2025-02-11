@@ -3,7 +3,6 @@ import pymongo
 import pinecone
 import openai
 import PyPDF2
-import requests
 import os
 from dotenv import load_dotenv
 
@@ -15,6 +14,7 @@ MONGO_URI = os.getenv("MONGO_URI")
 client = pymongo.MongoClient(MONGO_URI)
 db = client["Saudi_Arabia_Law"]
 collection = db["pdf_chunks"]
+pdf_collection = db["pdf_repository"]  # New collection for storing PDFs
 
 # Pinecone Setup
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -46,38 +46,29 @@ def process_pdf(pdf_path, chunk_size=500):
     return chunks
 
 # Function to store chunks in MongoDB
-def insert_chunks(chunks):
+def insert_chunks(chunks, pdf_name):
     for chunk in chunks:
-        collection.insert_one({"text": chunk})
+        collection.insert_one({"pdf_name": pdf_name, "text": chunk})
 
 # Function to convert text into vectors and store in Pinecone
-def store_vectors(chunks):
+def store_vectors(chunks, pdf_name):
     for i, chunk in enumerate(chunks):
         vector = openai.embeddings.create(input=[chunk], model="text-embedding-ada-002").data[0].embedding
-        index.upsert([(f"doc-{i}", vector, {"text": chunk})])
+        index.upsert([(f"{pdf_name}-doc-{i}", vector, {"pdf_name": pdf_name, "text": chunk})])
+
+# Function to retrieve stored PDFs from MongoDB repository
+def list_stored_pdfs():
+    return pdf_collection.distinct("pdf_name")  # Fetch unique PDF names
+
+# Function to store uploaded PDFs in MongoDB repository
+def store_pdf(pdf_name, pdf_data):
+    pdf_collection.insert_one({"pdf_name": pdf_name, "pdf_data": pdf_data})
 
 # Function to query Pinecone and get answers
-def query_vectors(query):
+def query_vectors(query, selected_pdf):
     vector = openai.embeddings.create(input=[query], model="text-embedding-ada-002").data[0].embedding
-    results = index.query(vector=vector, top_k=1, include_metadata=True)
+    results = index.query(vector=vector, top_k=1, include_metadata=True, filter={"pdf_name": selected_pdf})
     return results["matches"][0]["metadata"]["text"] if results["matches"] else "No relevant information found."
-
-# Function to list PDF files from a GitHub repository
-def list_pdf_files():
-    GITHUB_REPO = "https://api.github.com/repos/YOUR_USERNAME/YOUR_REPO/contents/pdfs"
-    response = requests.get(GITHUB_REPO)
-    if response.status_code == 200:
-        return [file["name"] for file in response.json() if file["name"].endswith(".pdf")]
-    return []
-
-# Function to download PDF from GitHub
-def download_pdf(filename):
-    file_url = f"https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/pdfs/{filename}"
-    response = requests.get(file_url)
-    file_path = f"temp_{filename}"
-    with open(file_path, "wb") as file:
-        file.write(response.content)
-    return file_path
 
 # Streamlit UI
 st.title("AI-Powered Q&A Chatbot 📚")
@@ -91,23 +82,22 @@ if pdf_source == "Upload from PC":
         with open(temp_pdf_path, "wb") as f:
             f.write(uploaded_file.read())
 
+        # Store PDF in MongoDB repository
+        store_pdf(uploaded_file.name, uploaded_file.read())
+
         chunks = process_pdf(temp_pdf_path)
-        insert_chunks(chunks)
-        store_vectors(chunks)
+        insert_chunks(chunks, uploaded_file.name)
+        store_vectors(chunks, uploaded_file.name)
         st.success("PDF uploaded and processed!")
 
 elif pdf_source == "Choose from Repository":
-    pdf_list = list_pdf_files()
+    pdf_list = list_stored_pdfs()
     selected_pdf = st.selectbox("Select a PDF", pdf_list)
-
-    if st.button("Download and Process"):
-        file_path = download_pdf(selected_pdf)
-        chunks = process_pdf(file_path)
-        insert_chunks(chunks)
-        store_vectors(chunks)
-        st.success("PDF processed successfully!")
 
 query = st.text_input("Ask a question:")
 if st.button("Get Answer"):
-    response = query_vectors(query)
-    st.write(f"**Answer:** {response}")
+    if selected_pdf:
+        response = query_vectors(query, selected_pdf)
+        st.write(f"**Answer:** {response}")
+    else:
+        st.warning("Please select a PDF from the repository.")
