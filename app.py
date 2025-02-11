@@ -88,7 +88,6 @@ def query_vectors(query, selected_pdf):
     if results["matches"]:
         matched_texts = [match["metadata"]["text"] for match in results["matches"]]
 
-        # Combine matched chunks for better response context
         combined_text = "\n\n".join(matched_texts)
 
         prompt = (
@@ -115,17 +114,17 @@ def translate_text(text, target_language):
     return GoogleTranslator(source="auto", target=target_language).translate(text)
 
 # ==============================
-#  Streamlit UI
+# 🚀 Streamlit UI
 # ==============================
 st.title("AI-Powered Saudi Arabia Law HelpDesk")
 
 # Sidebar - List all stored PDFs
-st.sidebar.header("Stored PDFs")
+st.sidebar.header("📂 Stored PDFs")
 pdf_list = list_stored_pdfs()
 if pdf_list:
-    with st.sidebar.expander("View Stored PDFs", expanded=False):
+    with st.sidebar.expander("📜 View Stored PDFs", expanded=False):
         for pdf in pdf_list:
-            st.sidebar.write(pdf)
+            st.sidebar.write(f"📄 {pdf}")
 else:
     st.sidebar.write("No PDFs stored yet. Upload one!")
 
@@ -134,7 +133,7 @@ selected_pdf = None
 # Select PDF source
 pdf_source = st.radio("Select PDF Source", ["Upload from PC", "Choose from the Document Storage"])
 
-# Upload a new PDF
+# 📌 Upload a new PDF
 if pdf_source == "Upload from PC":
     uploaded_file = st.file_uploader("Upload a PDF", type=["pdf"])
     if uploaded_file:
@@ -156,31 +155,45 @@ if pdf_source == "Upload from PC":
         # Assign uploaded file name to selected_pdf
         selected_pdf = uploaded_file.name
 
-# Browse previously uploaded PDFs
+# 📌 Browse previously uploaded PDFs
 elif pdf_source == "Choose from the Document Storage":
     if pdf_list:
         selected_pdf = st.selectbox("Select a PDF", pdf_list)
     else:
         st.warning("No PDFs available in the repository. Please upload one.")
 
-# Language Selection
-lang_option = st.radio("Choose Response Language", ["English", "Arabic"], index=0)
+# 🟢 Input Language Selection
+input_lang = st.radio("Choose Input Language", ["English", "Arabic"], index=0)
 
-# Query Input
-query = st.text_input("Ask a question (in English or Arabic):")
+# 📌 Adjust input box for Arabic
+if input_lang == "Arabic":
+    query = st.text_input("اسأل سؤالاً (باللغة العربية أو الإنجليزية):", key="query_input")
+    query_html = """
+    <style>
+    .stTextInput>div>div>input {
+        direction: rtl;
+        text-align: right;
+    }
+    </style>
+    """
+    st.markdown(query_html, unsafe_allow_html=True)
+else:
+    query = st.text_input("Ask a question (in English or Arabic):", key="query_input")
 
-# Get Answer Button
+# 📌 Get Answer Button
 if st.button("Get Answer"):
     if selected_pdf and query:
+        # Convert Arabic input to English for better AI processing
         detected_lang = GoogleTranslator(source="auto", target="en").translate(query)
+        
+        # Process the query
         response = query_vectors(detected_lang, selected_pdf)
 
-        # Translate response if Arabic is selected
-        if lang_option == "Arabic":
+        # Translate response back to Arabic if Arabic was selected
+        if input_lang == "Arabic":
             response = translate_text(response, "ar")
-
-        # Display response with RTL support for Arabic
-        if lang_option == "Arabic":
+            
+            # Display response in RTL format
             st.markdown(f"<div dir='rtl' style='text-align: right;'>{response}</div>", unsafe_allow_html=True)
         else:
             st.write(f"**Answer:** {response}")
