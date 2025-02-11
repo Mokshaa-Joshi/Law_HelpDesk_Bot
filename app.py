@@ -133,7 +133,7 @@ else:
 selected_pdf = None
 
 # Select PDF source
-pdf_source = st.radio("Select PDF Source", ["Upload from PC", "Choose from Repository"])
+pdf_source = st.radio("Select PDF Source", ["Upload from PC", "Choose from our Document Storage"])
 
 # 📌 Upload a new PDF
 if pdf_source == "Upload from PC":
